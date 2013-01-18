@@ -8,11 +8,87 @@
  * Licenced under the BSD License.
  * See https://raw.github.com/RobertWHurst/Hull/master/license.txt
  */
-(function(e,t){
+(function(context, factory) {
+  var namespaces;
 
-	//minified library wrapper
-	function n(){function e(){var n;n=t("amd");n.fork=e;return n}return e()}function r(){function r(){function o(){var t,r;newNamespaces=Array.prototype.slice.apply(arguments);for(r=0;r<i.length;r+=1){if(typeof s[i[r]]==="undefined"){delete e[i[r]]}else{e[i[r]]=s[i[r]]}}s={};for(r=0;r<newNamespaces.length;r+=1){if(typeof newNamespaces[r]!=="string"){throw new Error("Cannot replace namespaces. All new namespaces must be strings.")}s[newNamespaces[r]]=e[newNamespaces[r]];e[newNamespaces[r]]=n}i=newNamespaces;return i}var n,i=[],s={};n=t("global");n.fork=r;n.noConflict=o;return n}var n;n=r();n.noConflict("Hull")}[].indexOf||(Array.prototype.indexOf=function(e,t,n){for(n=this.length,t=(n+~~t)%n;t<n&&(!(t in this)||this[t]!==e);t++);return t^n?t:-1});if(typeof define==="function"&&define.amd){define(n)}else{r()}
+  //POLLYFILLS
+  [].indexOf||(Array.prototype.indexOf=function(a,b,c){for(c=this.length,b=(c+~~b)%c;b<c&&(!(b in this)||this[b]!==a);b++);return b^c?b:-1;});
 
+  //GLOBAL NAMESPACES
+  namespaces = ['myLibrary'];
+
+	//AMD
+	if(typeof define === 'function' && define.amd) { define(constructAMD); }
+
+	//GLOBAL
+	else { constructGlobal(); }
+
+	/**
+	 * Construct AMD version of the library
+	 */
+	function constructAMD() {
+
+		//create a library instance
+		return init();
+
+		//spawns a library instance
+		function init() {
+			var library;
+			library = factory('amd');
+			library.fork = init;
+			return library;
+		}
+	}
+
+	/**
+	 * Construct a Global version of the library
+	 */
+	function constructGlobal() {
+		var library;
+
+		//create a library instance
+		library = init();
+		library.noConflict.apply(null, namespaces);
+
+		//spawns a library instance
+		function init() {
+			var library, namespaces = [], previousValues = {};
+
+			library = factory('global');
+			library.fork = init;
+			library.noConflict = noConflict;
+			return library;
+
+			//sets library namespaces
+			function noConflict(    ) {
+				var args, nI, newNamespaces;
+
+				newNamespaces = Array.prototype.slice.apply(arguments);
+
+				for(nI = 0; nI < namespaces.length; nI += 1) {
+					if(typeof previousValues[namespaces[nI]] === 'undefined') {
+						delete context[namespaces[nI]];
+					} else {
+						context[namespaces[nI]] = previousValues[namespaces[nI]];
+					}
+				}
+
+				previousValues = {};
+
+				for(nI = 0; nI < newNamespaces.length; nI += 1) {
+					if(typeof newNamespaces[nI] !== 'string') {
+						throw new Error('Cannot replace namespaces. All new namespaces must be strings.');
+					}
+					previousValues[newNamespaces[nI]] = context[newNamespaces[nI]];
+					context[newNamespaces[nI]] = library;
+				}
+
+				namespaces = newNamespaces;
+
+				return namespaces;
+			}
+		}
+	}
 })(this, function(env) {
 	var version, Hull = {}, componentConstructors = {}, components = {}, componentNamespace;
 
@@ -21,7 +97,6 @@
 	////////////
 
 	version = '0.0.1';
-
 
 
 	//////////
@@ -37,7 +112,6 @@
 	Hull.connect = connect;
 
 	return Hull;
-
 
 
 	///////////////////////
@@ -188,24 +262,46 @@
 			 * @return {}             [description]
 			 */
 			function getSetContainer(parentId, containerId) {
-				//Insert into body
-				if(parentId === 'body' && containerId === 'default') {
-					var eI;
-					if(typeof component.element !== 'object') { return false; }
-					if(typeof component.element.push === 'function') {
-						for(eI = 0; eI < component.element.length; eI += 1) {
-							document.body.appendChild(component.element[eI]);
-						}
-					} else {
-						document.body.appendChild(component.element);
-					}
-					return true;
-				}
+
+				//validate args
+				if(typeof parentId !== 'string') { throw new Error('Cannot set the component container. parentId must be a string.'); }
+				if(typeof containerId !== 'string') { throw new Error('Cannot set the component container. containerId must be a string.'); }
+
+				//If parent is body and containerId === 'defualt' Insert into body
+				if(parentId === 'body' && containerId === 'default') { insertIntoBody(); }
+
+
 
 				///////////////////////////////////////////////////////////////
 				// FIND THE COMPONENT AND CONTAINER
 				///////////////////////////////////////////////////////////////
 			}
+
+			/**
+			 * Inserts the component into the body
+			 * @return {Boolean}
+			 */
+			function insertIntoBody() {
+				var eI;
+				if(typeof component.element !== 'object') { return false; }
+				if(typeof component.element.push === 'function') {
+					for(eI = 0; eI < component.element.length; eI += 1) {
+						document.body.appendChild(component.element[eI]);
+					}
+				} else {
+					document.body.appendChild(component.element);
+				}
+				return true;
+			}
+		}
+
+		function createContainer(id, accepts) {
+			var container, containerApi = {};
+			id = id || 'default';
+			accepts = accepts || [];
+
+			if(typeof id !== 'string') { throw new Error('Cannot create container. id must be a string.'); }
+			if(typeof accepts !== 'object' || typeof accepts.push !== 'function') { throw new Error('Cannot create container. accepts must be an array.'); }
 		}
 
 		/**
@@ -254,14 +350,13 @@
 			if(typeof id !== 'string') { throw new Error('Cannot create plug. id must be a string.'); }
 			if(plugs[id]) { throw new Error('Cannot create plug. Plug with an id of ' + id + ' already exists for this component.'); }
 
+			//create the plug emitter
 			plug = EventEmitter();
-
-			plugApi.write = write;
-			plugApi.clear = clear;
-
-
 			plugs[id] = plug;
 
+			//create the plug API
+			plugApi.write = write;
+			plugApi.clear = clear;
 			return plugApi;
 
 			/**
