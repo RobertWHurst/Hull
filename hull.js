@@ -262,19 +262,21 @@
 			 * @return {}             [description]
 			 */
 			function getSetContainer(parentId, containerId) {
+				var container;
 
-				//validate args
 				if(typeof parentId !== 'string') { throw new Error('Cannot set the component container. parentId must be a string.'); }
 				if(typeof containerId !== 'string') { throw new Error('Cannot set the component container. containerId must be a string.'); }
 
-				//If parent is body and containerId === 'defualt' Insert into body
-				if(parentId === 'body' && containerId === 'default') { insertIntoBody(); }
+				if(parentId === 'body' && containerId === 'default') { insertIntoBody(); return; }
 
+				if(typeof components[parentId] !== 'object') { throw new Error('Cannot set the component container. No component with id ' + parentId + '.'); }
+				if(typeof components[parentId].containers[containerId] !== 'object') { throw new Error('Cannot set the component container. Component with id ' + parentId + '. does not have container with id of ' + containerId + '.'); }
 
+				container = components[parentId].containers[containerId];
 
-				///////////////////////////////////////////////////////////////
-				// FIND THE COMPONENT AND CONTAINER
-				///////////////////////////////////////////////////////////////
+				if(container.accepts.length > 0 && container.accepts.indexOf(component.type) === -1) { throw new Error('Cannot set the component container. Container does not accept components of type' + component.type + '.'); }
+
+				container.trigger('element', component.element);
 			}
 
 			/**
@@ -302,6 +304,39 @@
 
 			if(typeof id !== 'string') { throw new Error('Cannot create container. id must be a string.'); }
 			if(typeof accepts !== 'object' || typeof accepts.push !== 'function') { throw new Error('Cannot create container. accepts must be an array.'); }
+
+			container = EventEmitter();
+			container.accepts = accepts;
+
+			containerApi = registerContainerHandler;
+			containerApi.clear = clear;
+
+			containers[id] = container;
+
+			return containerApi;
+
+			function registerContainerHandler(    ) {
+				var args;
+
+				args = Array.prototype.slice.apply(arguments);
+
+				container.on('element', function(element) {
+					var aI;
+					for(aI = 0; aI < args.length; aI += 1) {
+						args[aI](element);
+					}
+				});
+			}
+
+			/**
+			 * Clears the socket
+			 * @return {Boolean}
+			 */
+			function clear() {
+				if(!containers[id]) { return false; }
+				delete containers[id];
+				return true;
+			}
 		}
 
 		/**
