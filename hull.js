@@ -160,12 +160,10 @@
 			type = args[0];
 		}
 
-		containerId = containerId || 'default';
-
 		if(typeof id !== 'undefined' && typeof id !== 'string') { throw new Error('Cannot create component. id must be a string.'); }
 		if(typeof type !== 'string') { throw new Error('Cannot create component. type must be a string.'); }
-		if(typeof containerId !== 'string') { throw new Error('Cannot create component. containerId must be a string.'); }
-		if(typeof parentId !== 'undefined' && typeof parentId !== 'string') { throw new Error('Cannot create component. parentId must be a string.'); }
+		if(containerId && typeof containerId !== 'string') { throw new Error('Cannot create component. If given, containerId must be a string.'); }
+		if(parentId && typeof parentId !== 'undefined' && typeof parentId !== 'string') { throw new Error('Cannot create component. If given, parentId must be a string.'); }
 
 		return captureArguements;
 
@@ -186,9 +184,10 @@
 			constructorApi.open = {};
 			constructorApi.socket = createSocket;
 			constructorApi.plug = createPlug;
+			constructorApi.container = createContainer;
 
 			//append the constructor to the constructor arguments
-			args.push(constructorApi);
+			args.unshift(constructorApi);
 
 			//make sure the component type is registered
 			if(!componentConstructors[type]) { throw new Error('Cannot create component. No component is registered with the type of ' + type + '.'); }
@@ -211,7 +210,7 @@
 			if(typeof exported.element !== 'object') { componentNamespace.clear(uid); throw new Error('Cannot create component. The component must have an element property pointing to a DOM node or a array of DOM nodes.'); }
 			if(typeof exported.clear !== 'function') { componentNamespace.clear(uid); throw new Error('Cannot create component. The component does not implement a clear method.'); }
 
-			//create the component api
+			//create the component API
 			componentApi.container = getSetContainer;
 			for(property in exported) {
 				if(!exported.hasOwnProperty(property)) { continue; }
@@ -227,13 +226,17 @@
 			component.containers = containers;
 			component.api = componentApi;
 
+			//attach getSetContainer
+			componentApi.parent = getSetContainer;
+			componentApi.clear = clear;
+
 			//emit the setup event
 			constructorApi.set('setup');
 			componentApi.state = 'setup';
 			componentApi.set('setup');
 
 			//insert the component into its container
-			getSetContainer(parentId, containerId);
+			if(parentId) { getSetContainer(parentId, containerId); }
 
 			//stash the component
 			components[uid] = component;
@@ -263,6 +266,8 @@
 			 */
 			function getSetContainer(parentId, containerId) {
 				var container;
+
+				containerId = containerId || 'default';
 
 				if(typeof parentId !== 'string') { throw new Error('Cannot set the component container. parentId must be a string.'); }
 				if(typeof containerId !== 'string') { throw new Error('Cannot set the component container. containerId must be a string.'); }

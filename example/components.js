@@ -5,7 +5,7 @@
 	Hull.register('light', Light);
 
 	//Light constructor
-	function Light(color, component) {
+	function Light(component, color) {
 		var light = {}, element, socket, plug, powered = false;
 
 		//create an element
@@ -54,7 +54,7 @@
 	}
 
 	//Toggle button constructor
-	function ToggleButton(label, component) {
+	function ToggleButton(component, label) {
 		var button = {}, element, plug, bool = false;
 
 		//create the button element
