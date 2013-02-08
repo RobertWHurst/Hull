@@ -15,7 +15,7 @@
   [].indexOf||(Array.prototype.indexOf=function(a,b,c){for(c=this.length,b=(c+~~b)%c;b<c&&(!(b in this)||this[b]!==a);b++);return b^c?b:-1;});
 
   //GLOBAL NAMESPACES
-  namespaces = ['myLibrary'];
+  namespaces = ['Hull'];
 
 	//AMD
 	if(typeof define === 'function' && define.amd) { define(constructAMD); }
