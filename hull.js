@@ -139,7 +139,8 @@
 	 * @signature createComponent(type)
 	 */
 	function createComponent(    ) {
-		var id, componentApi, type, parentId, containerId, sockets = {}, plugs = {}, containers = {}, component, constructorApi,
+		var id, component = {}, componentApi, type, parentId, containerId, 
+		sockets = {}, plugs = {}, containers = {}, constructorApi,
 		componentWrapper = {}, accepts = [];
 
 		args = toArray(arguments);
@@ -204,7 +205,7 @@
 		 * @param  {Object} exports
 		 */
 		function initCompletionHandler(exported) {
-			var component = {}, property;
+			var property;
 
 			if(typeof exported !== 'object') { componentNamespace.clear(uid); throw new Error('Cannot create component. The constructor for components of the type ' + type + ' did not return a valid component object.'); }
 			if(typeof exported.element !== 'object') { componentNamespace.clear(uid); throw new Error('Cannot create component. The component must have an element property pointing to a DOM node or a array of DOM nodes.'); }
@@ -219,18 +220,22 @@
 				componentApi[property] = exported[property];
 			}
 
-			//create the component object
+			component.id = uid;
+			component.parent = false;
+			component.inDOM = false;
 			component.element = exported.element;
 			component.sockets = sockets;
 			component.plugs = plugs;
 			component.containers = containers;
-			component.api = componentApi;
+			component.componentApi = componentApi;
+			component.constructorApi = constructorApi;
 
-			//attach getSetContainer
 			componentApi.parent = getSetContainer;
 			componentApi.clear = clear;
+			componentApi.detach = detach;
 
-			//emit the setup event
+			constructorApi.detach = detach;
+
 			constructorApi.set('setup');
 			componentApi.state = 'setup';
 			componentApi.set('setup');
@@ -255,7 +260,36 @@
 				constructorApi.set('clear');
 				componentApi.state = 'cleared';
 				componentApi.set('clear');
+
+				component.parent = false;
+				component.inDOM = false;
+				setDOMTreeRelation();
+
 				return exported.clear();
+			}
+
+			/**
+			 * Clear wrapper for component
+			 * @return {*}
+			 */
+			function detach() {
+				var eI;
+
+				if(typeof component.element.push === 'function') {
+					for(eI = 0; eI < component.element.length; eI += 1) {
+						component.element[eI].parent.removeChild(component.element[eI]);
+					}
+				} else {
+					component.element.parent.appendChild(component.element);
+				}
+
+				component.parent = false;
+				component.inDOM = false;
+				setDOMTreeRelation();
+
+				if(typeof exported.detach === 'function') {
+					return exported.detach();
+				}
 			}
 
 			/**
@@ -281,7 +315,13 @@
 
 				if(container.accepts.length > 0 && container.accepts.indexOf(component.type) === -1) { throw new Error('Cannot set the component container. Container does not accept components of type' + component.type + '.'); }
 
-				container.trigger('element', component.element);
+				component.parent = parentId;
+				component.inDOM = components[parentId].inDOM;
+
+				container.trigger('component', component);
+				constructorApi.set('parent', components[parentId]);
+
+				setDOMTreeRelation();
 			}
 
 			/**
@@ -298,6 +338,10 @@
 				} else {
 					document.body.appendChild(component.element);
 				}
+
+				component.inDOM = true;
+				setDOMTreeRelation();
+
 				return true;
 			}
 		}
@@ -320,16 +364,9 @@
 
 			return containerApi;
 
-			function registerContainerHandler(    ) {
-				var args;
-
-				args = Array.prototype.slice.apply(arguments);
-
-				container.on('element', function(element) {
-					var aI;
-					for(aI = 0; aI < args.length; aI += 1) {
-						args[aI](element);
-					}
+			function registerContainerHandler(callback) {
+				return container.on('component', function(component) {
+					callback(component);
 				});
 			}
 
@@ -414,6 +451,33 @@
 				if(!plugs[id]) { return false; }
 				delete plugs[id];
 				return true;
+			}
+		}
+
+		function setDOMTreeRelation() {
+			setRelation(component);
+			
+			(function exec(parent) {
+				var id;
+
+				for(id in components) {
+					if(!components.hasOwnProperty(id)) { continue; }
+					if(components[id].parent === parent.id && components[id].inDOM !== parent.inDOM) {
+						components[id].inDOM = parent.inDOM;
+						setRelation(components[id]);
+						exec(components[id]);
+					}
+				}
+			})(component);
+
+			function setRelation(component) {
+				if(component.inDOM) {
+					component.constructorApi.trigger('draw');
+					component.componentApi.trigger('draw');
+				} else {
+					component.constructorApi.trigger('detach');
+					component.componentApi.trigger('detach');
+				}
 			}
 		}
 	}
